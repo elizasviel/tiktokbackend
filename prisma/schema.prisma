@@ -1,0 +1,35 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Video {
+    id         String    @id @default(uuid())
+    youtube_id String    @unique
+    title      String
+    segments   Segment[]
+    created_at DateTime  @default(now())
+}
+
+model Segment {
+    id         String                       @id @default(uuid())
+    video_id   String
+    video      Video                        @relation(fields: [video_id], references: [id])
+    start_time Float
+    end_time   Float
+    transcript String
+    vector     Unsupported("vector(1536)")?
+    created_at DateTime                     @default(now())
+}
+
+model Cache {
+    id         String   @id @default(uuid())
+    query      String
+    segments   String[] // Array of segment IDs
+    created_at DateTime @default(now())
+    expires_at DateTime
+}
