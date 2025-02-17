@@ -5,6 +5,7 @@ import { CacheService } from "./cache";
 interface SegmentQueryResult {
   id: string;
   transcript: string;
+  summary: string;
   start_time: number;
   end_time: number;
   youtube_id: string;
@@ -67,6 +68,7 @@ export class QueryService {
       SELECT 
         s.id,
         s.transcript,
+        s.summary,
         s.start_time,
         s.end_time,
         s.video_id,

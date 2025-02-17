@@ -3,11 +3,7 @@ import fs from "fs";
 import path from "path";
 
 export class TranscriptionService {
-  private openai;
-
-  constructor(apiKey: string) {
-    this.openai = new OpenAI({ apiKey });
-  }
+  constructor(private openai: OpenAI) {}
 
   async transcribeAudio(audioPath: string) {
     try {

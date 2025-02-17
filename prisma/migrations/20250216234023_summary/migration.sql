@@ -15,6 +15,7 @@ CREATE TABLE "Segment" (
     "start_time" DOUBLE PRECISION NOT NULL,
     "end_time" DOUBLE PRECISION NOT NULL,
     "transcript" TEXT NOT NULL,
+    "summary" TEXT NOT NULL,
     "vector" vector(1536),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

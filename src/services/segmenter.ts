@@ -3,7 +3,11 @@ import fs from "fs";
 import path from "path";
 
 export class VideoSegmenter {
-  async segmentVideo(videoPath: string, segmentDuration: number = 30) {
+  async segmentVideo(
+    videoPath: string,
+    onProgress?: (progress: number) => void,
+    segmentDuration: number = 30
+  ): Promise<string[]> {
     console.log(`[Segmenter] Starting video segmentation for ${videoPath}`);
     console.log(`[Segmenter] Segment duration: ${segmentDuration} seconds`);
 
@@ -24,9 +28,9 @@ export class VideoSegmenter {
         ])
         .output(outputPattern)
         .on("progress", (progress) => {
-          console.log(
-            `[Segmenter] Processing: ${Math.round(progress.percent ?? 0)}% done`
-          );
+          const percentComplete = Math.round(progress.percent ?? 0);
+          console.log(`[Segmenter] Processing: ${percentComplete}% done`);
+          onProgress?.(percentComplete);
         })
         .on("end", () => {
           const files = fs

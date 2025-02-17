@@ -22,6 +22,7 @@ model Segment {
     start_time Float
     end_time   Float
     transcript String
+    summary    String
     vector     Unsupported("vector(1536)")?
     created_at DateTime                     @default(now())
 }

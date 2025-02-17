@@ -1,11 +1,7 @@
 import { OpenAI } from "openai";
 
 export class EmbeddingService {
-  private openai;
-
-  constructor(apiKey: string) {
-    this.openai = new OpenAI({ apiKey });
-  }
+  constructor(private openai: OpenAI) {}
 
   async createEmbedding(text: string) {
     try {

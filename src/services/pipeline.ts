@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
+import { OpenAI } from "openai";
 
 export class ProcessingPipeline {
   constructor(
@@ -13,14 +14,13 @@ export class ProcessingPipeline {
     private segmenter: VideoSegmenter,
     private transcription: TranscriptionService,
     private embedding: EmbeddingService,
-    private prisma: PrismaClient
+    private prisma: PrismaClient,
+    private openai: OpenAI
   ) {}
 
-  async processVideo(youtubeId: string) {
-    console.log(`[Pipeline] Starting processing for YouTube ID: ${youtubeId}`);
+  async processVideo(youtubeId: string, onProgress: (status: any) => void) {
     try {
-      // 1. Get video details
-      console.log(`[Pipeline] Fetching video details for ${youtubeId}`);
+      onProgress({ status: "fetching", message: "Fetching video details" });
       const details = await this.youtube.getVideoDetails(youtubeId);
       if (!details || !details.snippet) {
         throw new Error("Video details not found");
@@ -46,7 +46,7 @@ export class ProcessingPipeline {
       }
 
       // 2. Download video
-      console.log(`[Pipeline] Downloading video from YouTube`);
+      onProgress({ status: "downloading", message: "Downloading video" });
       const tempDir = path.join(process.cwd(), "temp");
       await fs.promises.mkdir(tempDir, { recursive: true });
       const videoPath = path.join(tempDir, `${youtubeId}.mp4`);
@@ -55,16 +55,30 @@ export class ProcessingPipeline {
       );
       console.log(`[Pipeline] Video downloaded successfully to ${videoPath}`);
 
-      // 3. Segment video
-      console.log(`[Pipeline] Starting video segmentation`);
-      const segments = await this.segmenter.segmentVideo(videoPath);
+      // 3. Segment video - Modified to handle segmentation progress
+      onProgress({
+        status: "segmenting",
+        message: "Starting video segmentation",
+      });
+      const segments = await this.segmenter.segmentVideo(
+        videoPath,
+        (progress) => {
+          onProgress({
+            status: "segmenting",
+            message: `Segmenting video`,
+            progress: progress,
+          });
+        }
+      );
       console.log(`[Pipeline] Created ${segments.length} segments`);
 
-      // 4. Process each segment
+      // 4. Process each segment - Modified status message
       for (let i = 0; i < segments.length; i++) {
-        console.log(
-          `[Pipeline] Processing segment ${i + 1}/${segments.length}`
-        );
+        onProgress({
+          status: "transcribing", // Changed from processing_segment
+          message: `Transcribing segment ${i + 1}/${segments.length}`,
+          progress: ((i + 1) / segments.length) * 100,
+        });
         const segmentPath = segments[i];
 
         console.log(`[Pipeline] Extracting audio from segment ${i + 1}`);
@@ -76,6 +90,25 @@ export class ProcessingPipeline {
         const transcription = await this.transcription.transcribeAudio(
           audioPath
         );
+
+        // Generate a summary using OpenAI
+        console.log(`[Pipeline] Generating summary for segment ${i + 1}`);
+        const summary = await this.openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Create a concise 2-line summary of the following transcript:",
+            },
+            {
+              role: "user",
+              content: transcription.text,
+            },
+          ],
+          max_tokens: 100,
+          temperature: 0.7,
+        });
 
         console.log(`[Pipeline] Generating embedding for segment ${i + 1}`);
         const vector = await this.embedding.createEmbedding(transcription.text);
@@ -89,7 +122,8 @@ export class ProcessingPipeline {
             end_time,
             transcript,
             vector,
-            created_at
+            created_at,
+            summary
           )
           VALUES (
             gen_random_uuid(),
@@ -98,7 +132,8 @@ export class ProcessingPipeline {
             ${(i + 1) * 30},
             ${transcription.text},
             ${vector}::vector,
-            NOW()
+            NOW(),
+            ${summary.choices[0].message.content}
           )
         `;
 
@@ -111,9 +146,9 @@ export class ProcessingPipeline {
 
       console.log(`[Pipeline] Cleaning up downloaded video file`);
       await fs.promises.unlink(videoPath);
-      console.log(`[Pipeline] Video processing completed successfully`);
+      onProgress({ status: "completed", message: "Processing completed" });
     } catch (error) {
-      console.error(`[Pipeline] Error processing video ${youtubeId}:`, error);
+      onProgress({ status: "error", message: (error as Error).message });
       throw error;
     }
   }
